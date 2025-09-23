@@ -1,0 +1,38 @@
+<video id="player" autoplay ></video>
+<button id="capture">Capture</button>
+<canvas id="canvas" style="display: none"></canvas>
+<script>
+    const player = document.getElementById('player');
+    const canvas = document.getElementById('canvas');
+    const captureButton = document.getElementById('capture');
+
+    const constraints = {
+        video: {
+            facingMode: { ideal: 'environment' }
+        },
+        audio: false
+    };
+
+    captureButton.addEventListener('click', () => {
+        const src = captureFrame();
+        document.getElementById("photoTaken").src = src;
+        console.log(src);
+    });
+
+    // Attach the video stream to the video element and autoplay.
+    navigator.mediaDevices.getUserMedia(constraints)
+             .then((stream) => {
+                 player.srcObject = stream;
+             });
+
+    function captureFrame(){
+        let w = player.videoWidth;
+        let h = player.videoHeight;
+        canvas.width  = w;
+        canvas.height = h;
+        let ctx = canvas.getContext('2d');
+        ctx.drawImage(player, 0, 0, w, h);
+        return canvas.toDataURL("image/jpeg")
+    }
+</script>
+<img id="photoTaken" />
