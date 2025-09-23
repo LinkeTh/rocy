@@ -1,0 +1,29 @@
+<section class="border rounded p-4 space-y-3 bg-white">
+  <h2 class="font-semibold">Upload profile image</h2>
+
+  <input type="file" accept="image/*" (change)="onFileChange($event)" class="block" />
+
+  @if (selectedFile()) {
+    <div class="flex items-start space-x-4">
+      @if (previewUrl()) {
+        <img [src]="previewUrl()" alt="Preview" class="w-24 h-24 object-cover rounded border" />
+      }
+      <div class="text-sm text-gray-700">
+        <div>File: <span class="font-medium">{{ selectedFile()!.name }}</span></div>
+        <div>Size: {{ (selectedFile()!.size / 1024) | number:'1.0-0' }} KB</div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 pt-2">
+      <button (click)="save()" [disabled]="uploading()" class="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-60">@if (uploading()) { Uploading... } @else { Save }</button>
+      <button (click)="cancel()" [disabled]="uploading()" class="px-3 py-1.5 rounded border">Cancel</button>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="text-red-600 text-sm">{{ error() }}</div>
+  }
+  @if (success()) {
+    <div class="text-green-700 text-sm">Upload successful.</div>
+  }
+</section>

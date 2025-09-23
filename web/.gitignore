@@ -1,0 +1,7 @@
+/target
+.env
+.idea
+.junie
+/node_modules
+.angular
+/dist
