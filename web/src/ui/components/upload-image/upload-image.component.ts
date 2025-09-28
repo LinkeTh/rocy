@@ -64,6 +64,7 @@ export class UploadImageComponent {
         const url = `${environment.apiBase}/upload`;
         this.http.post(url, form, {withCredentials: true}).subscribe({
             next: (res) => {
+                console.log('Upload successful', res);
                 this.success.set(true);
                 this.uploaded.emit(res);
                 // keep the selection to allow user to see what was uploaded; they can cancel to reset

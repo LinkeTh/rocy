@@ -3,13 +3,16 @@
 .PHONY: build run watch fmt clippy check db-up db-down migrate
 
 build:
-	@cargo build
+	cd ./web && bun run build && cd .. && cargo build --release
+#	cd ./web && bun run build
 
 run:
-	@cargo run
+	cd ./web && bun run build && cd .. && cargo run --release
+	@#cargo run& cd ./web && bun run build
 
 watch:
-	@cargo watch -x run
+	cd ./web && bun run build && cd .. && cargo watch -x run
+	@#cargo watch -x run& cd ./web && bun start
 
 fmt:
 	@cargo fmt --all

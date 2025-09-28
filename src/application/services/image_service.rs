@@ -3,11 +3,10 @@ use crate::application::errors::AppError;
 use crate::application::ports::image_repository::ImageRepository;
 use crate::application::types::{ImageId, SessionUser, UserId};
 use crate::config::Config;
-use crate::domain;
+use crate::domain::receipt::{call_openai, ReceiptOcrResponse};
 use axum::extract::Multipart;
 use base64::Engine;
-use serde_json::Value;
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct ImageService<D: ImageRepository> {
@@ -20,7 +19,7 @@ impl<D: ImageRepository> ImageService<D> {
         Self { image_repo, config }
     }
 
-    pub async fn store(&self, user_id: &UserId, file_name: &str, content_type: &str, data_b64: &str) -> Result<ImageId, AppError> {
+    pub async fn create_image(&self, user_id: &UserId, file_name: &str, content_type: &str, data_b64: &str) -> Result<ImageId, AppError> {
         self.image_repo.create_image(user_id, file_name, content_type, data_b64).await
     }
 
@@ -28,42 +27,47 @@ impl<D: ImageRepository> ImageService<D> {
         self.image_repo.find_image_by_user_id(&profile.user_id).await
     }
 
-    pub async fn upload_image(&self, mut multipart: Multipart, profile: SessionUser) -> Result<Vec<Value>, AppError> {
-        let mut saved_files = Vec::new();
-        let mut total_bytes: usize = 0;
+    pub async fn upload_image(&self, mut multipart: Multipart, profile: SessionUser) -> Result<Option<ReceiptOcrResponse>, AppError> {
+        // let mut saved_files = Vec::new();
 
-        while let Ok(Some(mut field)) = multipart.next_field().await {
+        if let Ok(Some(mut field)) = multipart.next_field().await {
             let name = field.name().map(|s| s.to_string());
             let file_name = field
                 .file_name()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| format!("{}.bin", ulid::Ulid::new()));
 
+            info!("load image: {}", file_name);
+
             // Buffer file into memory (bounded by size limits)
             let mut data: Vec<u8> = Vec::new();
             let mut file_bytes: usize = 0;
             while let Ok(Some(chunk)) = field.chunk().await {
                 file_bytes += chunk.len();
-                total_bytes += chunk.len();
-                if file_bytes > self.config.per_file_max_bytes || total_bytes > self.config.max_upload_bytes {
-                    return Err(AppError::PayloadTooLarge);
-                }
                 data.extend_from_slice(&chunk);
             }
 
             // Magic byte validation and content type detection
-            let detected_ct = match domain::image::detect_image_type(&data) {
+            let detected_ct = match detect_image_type(&data) {
                 Some(ct) => ct,
                 None => {
+                    error!("image type unsupported: {}", file_bytes);
                     return Err(AppError::UnsupportedMediaType);
                 }
             };
+            let _ = tokio::fs::write(format!("{}/{}", self.config.upload_dir.clone(), &file_name), &data).await;
+
+            println!("Saved {:?} as {:?}, {} bytes", name, file_name, file_bytes);
+            // let path = format!("{}/{}", self.config.upload_dir.clone(), &file_name);
+            // parse_image(&path)?;
 
             // Base64 encode the image
             let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+            let result = call_openai(&b64).await?;
 
-            // Store into DB via repository adapter
-            let image_id: ImageId = match self.store(&profile.user_id, &file_name, detected_ct, &b64).await {
+            let res_json = serde_json::to_string(&result)?;
+
+            let _image_id: ImageId = match self.create_image(&profile.user_id, &file_name, detected_ct, &res_json).await {
                 Ok(id) => id,
                 Err(e) => {
                     error!(?e, "failed to insert user image");
@@ -71,14 +75,23 @@ impl<D: ImageRepository> ImageService<D> {
                 }
             };
 
-            saved_files.push(serde_json::json!({
-            "field": name,
-            "file_name": file_name,
-            "content_type": detected_ct,
-            "size": file_bytes,
-            "id": image_id
-            }));
+            return Ok(result);
         }
-        Ok(saved_files)
+        Ok(None)
     }
+}
+pub fn detect_image_type(data: &[u8]) -> Option<&'static str> {
+    if data.len() >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
+        return Some("image/jpeg");
+    }
+    if data.len() >= 8 && data[0..8] == [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
+        return Some("image/png");
+    }
+    if data.len() >= 6 && (&data[0..6] == b"GIF87a" || &data[0..6] == b"GIF89a") {
+        return Some("image/gif");
+    }
+    if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        return Some("image/webp");
+    }
+    None
 }

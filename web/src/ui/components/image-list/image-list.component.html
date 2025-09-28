@@ -1,39 +1,44 @@
 <section class="space-y-3">
-  <h2 class="text-xl font-semibold">Uploaded images</h2>
+    <h2 class="text-xl font-semibold">Uploaded images</h2>
 
-  @if (loading()) {
-    <div class="text-gray-500 text-sm">Loading images...</div>
-  }
+    @if (loading()) {
+        <div class="text-gray-500 text-sm">Loading images...</div>
+    }
 
-  @if (error()) {
-    <div class="text-red-600 text-sm">{{ error() }}</div>
-  }
+    @if (error()) {
+        <div class="text-red-600 text-sm">{{ error() }}</div>
+    }
 
-  @if (!loading() && images()?.length === 0) {
-    <div class="text-gray-600 text-sm">No images uploaded yet.</div>
-  }
+    @if (!loading() && images()?.length === 0) {
+        <div class="text-gray-600 text-sm">No images uploaded yet.</div>
+    }
 
-  @if (images() && images()!.length > 0) {
-    <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-      @for (img of images()!; track img.id) {
-        <li class="border rounded-lg p-2 bg-white flex flex-col items-center">
-          <img
-            [src]="'data:' + img.content_type + ';base64,' + img.data_base64"
-            alt="{{ img.file_name }}"
-            width="160"
-            height="160"
-            class="w-40 h-40 object-cover rounded-md border"
-          />
-          <div class="w-full mt-1.5">
-            <div class="font-medium truncate" [title]="img.file_name">{{ img.file_name }}</div>
-            <div class="text-xs text-gray-500">ID: {{ img.id }} · User: {{ img.user_id }}</div>
-          </div>
-        </li>
-      }
-    </ul>
-  }
+    @if (images() && images()!.length > 0) {
+        <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+            @for (img of images()!; track img.id) {
+                <li class="border rounded-lg p-2 bg-white flex flex-col items-center">
+                    <span>{{ img.data_base64 }}</span>
+                    <!--                    <img-->
+                    <!--                            [src]="'data:' + img.content_type + ';base64,' + img.data_base64"-->
+                    <!--                            alt="{{ img.file_name }}"-->
+                    <!--                            width="160"-->
+                    <!--                            height="160"-->
+                    <!--                            class="w-40 h-40 object-cover rounded-md border"-->
+                    <!--                    />-->
+                    <div class="w-full mt-1.5">
+                        <div class="font-medium truncate" [title]="img.file_name">{{ img.file_name }}</div>
+                        <div class="text-xs text-gray-500">ID: {{ img.id }} · User: {{ img.user_id }}</div>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
 
-  <div class="mt-1">
-    <button class="px-2.5 py-1.5 rounded-md border bg-gray-50 disabled:opacity-60" (click)="refresh()" [disabled]="loading()">@if (loading()) { Refreshing... } @else { Refresh }</button>
-  </div>
+    <div class="mt-1">
+        <button class="px-2.5 py-1.5 rounded-md border bg-gray-50 disabled:opacity-60" (click)="refresh()" [disabled]="loading()">@if (loading()) {
+            Refreshing...
+        } @else {
+            Refresh
+        }</button>
+    </div>
 </section>

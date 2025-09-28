@@ -3,8 +3,7 @@ pub mod application;
 mod config;
 pub mod domain;
 use application::types::{SessionId, SessionUser};
-use axum::extract::{FromRef, FromRequestParts};
-use axum::routing::get_service;
+use axum::extract::{DefaultBodyLimit, FromRef, FromRequestParts};
 use axum::{
     routing::{get, post},
     Router,
@@ -35,7 +34,7 @@ use axum_extra::extract::PrivateCookieJar;
 use config::Config;
 use reqwest::Method;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeFile;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
@@ -84,15 +83,14 @@ fn init_app_state(config: &Config, db: Pool<Postgres>) -> AppState {
     let auth_service = Arc::new(Authentication::new(session_service.clone(), user_service.clone(), provider));
     let key = config.cookie_secret.clone();
 
-    let state = AppState {
+    AppState {
         key: Key::from(key.as_bytes()),
         config: config.clone(),
         session_service,
         user_service,
         image_service,
         authentication: auth_service,
-    };
-    state
+    }
 }
 
 async fn run_sqlx_migration(db: &Pool<Postgres>) {
@@ -100,29 +98,23 @@ async fn run_sqlx_migration(db: &Pool<Postgres>) {
 }
 
 async fn init_pg_pool(config: &Config) -> Pool<Postgres> {
-    let db = PgPoolOptions::new()
+    PgPoolOptions::new()
         .max_connections(5)
         .connect(&config.database_url)
         .await
-        .expect("Failed to connect to Postgres");
-    db
+        .expect("Failed to connect to Postgres")
 }
 
 fn build_routes(state: AppState) -> Router {
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
-    let login_router = Router::new().route("/login", get(handler::login_handler));
-    let auth_router = Router::new().route("/auth/google/callback", get(handler::google_callback));
+
+    let login_router = Router::new().route("/api/login", get(handler::login_handler));
+    let auth_router = Router::new().route("/api/auth/google/callback", get(handler::google_callback));
     let protected_router = Router::new()
-        .route("/protected", get(handler::protected))
-        .route("/me", get(handler::me))
-        .route("/logout", get(handler::logout_handler))
-        .route("/logout", post(handler::logout_handler));
-    let favicon_router = Router::new()
-        .route_service("/favicon.ico", get_service(ServeFile::new("assets/favicon.ico")))
-        .layer(SetResponseHeaderLayer::overriding(
-            HeaderName::from_static("cache-control"),
-            HeaderValue::from_static("public, max-age=31536000, immutable"),
-        ));
+        .route("/api/protected", get(handler::protected))
+        .route("/api/me", get(handler::me))
+        .route("/api/logout", get(handler::logout_handler));
+    let serve_dir = ServeDir::new("web/dist/rocy-app/browser/").not_found_service(ServeFile::new("web/dist/rocy-app/browser/index.html"));
 
     let cors = if let Some(origins) = state.config.cors_allow_origins.as_ref() {
         if origins.as_str() == "*" {
@@ -141,15 +133,15 @@ fn build_routes(state: AppState) -> Router {
         CorsLayer::permissive()
     };
 
-    let app = Router::new()
-        .merge(favicon_router)
+    Router::new()
         .merge(login_router)
         .merge(auth_router)
         .merge(protected_router)
-        .route("/healthz", get(handler::health_handler))
-        .route("/upload", post(handler::upload_handler))
-        .route("/images", get(handler::images_handler))
-        .route("/metrics", get(|| async move { metric_handle.render() }))
+        .route("/api/healthz", get(handler::health_handler))
+        .route("/api/upload", post(handler::upload_handler))
+        .route("/api/images", get(handler::images_handler))
+        .route("/api/metrics", get(|| async move { metric_handle.render() }))
+        .fallback_service(serve_dir.clone())
         .with_state(state)
         .layer(prometheus_layer)
         .layer(TraceLayer::new_for_http())
@@ -166,8 +158,8 @@ fn build_routes(state: AppState) -> Router {
         .layer(SetResponseHeaderLayer::if_not_present(
             HeaderName::from_static("referrer-policy"),
             HeaderValue::from_static("no-referrer"),
-        ));
-    app
+        ))
+        .layer(DefaultBodyLimit::max(1024 * 1024 * 50))
 }
 
 fn init_tracing() {

@@ -20,6 +20,21 @@ ulid = "1.2.1"
 axum-prometheus = "0.9"
 axum-extra = { version = "0.10.1", features = ["cookie-private", "cookie"] }
 cookie = "0.18.1"
-tower-http = { version = "0.6.6", features = ["fs", "cors", "trace", "set-header"] }
+tower-http = { version = "0.6.6", features = ["fs", "cors", "trace", "set-header", "mime_guess", "mime"] }
 base64 = "0.22"
 async-trait = "0.1.89"
+async-openai = { version = "0.29.3", features = ["byot"] }
+schemars = "1.0.4"
+
+#ocrs = "0.11.0"
+#rayon = "1.10.0"
+#rten = "0.22.1"
+#rten-imageproc = "0.22.1"
+#rten-tensor = "0.22.1"
+#image = { version = "0.25.8", default-features = false, features = ["png", "jpeg", "webp"] }
+#anyhow = "1.0.100"
+
+#[dev-dependencies]
+#fastrand = "2.3.0"
+#lexopt = "0.3.1"
+#rten = { version = "0.22.1", features = ["model_builder"] }

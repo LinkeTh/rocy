@@ -16,8 +16,7 @@ pub struct Config {
     pub cookie_samesite: SameSiteMode,
     pub cors_allow_origins: Option<String>,
     pub enable_offline_access: bool,
-    pub max_upload_bytes: usize,
-    pub per_file_max_bytes: usize,
+    pub openai_key: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -43,8 +42,7 @@ impl Default for Config {
             cookie_samesite: SameSiteMode::Lax,
             cors_allow_origins: None,
             enable_offline_access: false,
-            max_upload_bytes: 20 * 1024 * 1024,   // 20 MiB total
-            per_file_max_bytes: 10 * 1024 * 1024, // 10 MiB per file
+            openai_key: String::new(),
         }
     }
 }
@@ -74,12 +72,7 @@ impl Config {
         c.enable_offline_access = std::env::var("ENABLE_OFFLINE_ACCESS")
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
-        if let Ok(v) = std::env::var("MAX_UPLOAD_BYTES").and_then(|s| s.parse::<usize>().map_err(|_| std::env::VarError::NotPresent)) {
-            c.max_upload_bytes = v;
-        }
-        if let Ok(v) = std::env::var("PER_FILE_MAX_BYTES").and_then(|s| s.parse::<usize>().map_err(|_| std::env::VarError::NotPresent)) {
-            c.per_file_max_bytes = v;
-        }
+        c.openai_key = std::env::var("OPENAI_API_KEY").unwrap_or(c.openai_key);
         if matches!(c.cookie_samesite, SameSiteMode::None) && !c.cookie_secure {
             panic!("COOKIE_SAMESITE=None requires COOKIE_SECURE=true");
         }

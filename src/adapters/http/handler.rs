@@ -37,7 +37,7 @@ pub(crate) async fn upload_handler(
     }
 
     let result = state.image_service.upload_image(multipart, profile).await?;
-    Ok((StatusCode::OK, Json(serde_json::json!({"saved": result}))).into_response())
+    Ok((StatusCode::OK, Json(serde_json::json!({"result": result}))).into_response())
 }
 
 pub(crate) async fn login_handler(State(state): State<AppState>, jar: PrivateCookieJar) -> impl IntoResponse {

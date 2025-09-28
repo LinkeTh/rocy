@@ -1,5 +1,6 @@
+use async_openai::error::OpenAIError;
 use axum::response::Response;
-use axum::{Json, http::StatusCode, response::IntoResponse};
+use axum::{http::StatusCode, response::IntoResponse, Json};
 use oauth2::HttpClientError;
 use reqwest::Error;
 use serde::{Serialize, Serializer};
@@ -26,6 +27,10 @@ pub enum AppError {
     ParseIntError(#[from] std::num::TryFromIntError),
     #[error("Encountered an error trying to convert an infallible value: {0}")]
     FromRequestPartsError(#[from] std::convert::Infallible),
+    #[error("Error talking with chad gypydy: {0:?}")]
+    OpenAIError(#[from] OpenAIError),
+    #[error("Serde json failed: {0}")]
+    SerdeJsonError(#[from] serde_json::error::Error),
 }
 
 struct AppStatusCode(StatusCode);
@@ -46,6 +51,16 @@ struct JsonErrorResponse {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let res = match &self {
+            Self::SerdeJsonError(_) => JsonErrorResponse {
+                code: "external_error",
+                message: "Internal server error",
+                status: AppStatusCode(StatusCode::INTERNAL_SERVER_ERROR),
+            },
+            Self::OpenAIError(_) => JsonErrorResponse {
+                code: "openai_error",
+                message: "Internal server error",
+                status: AppStatusCode(StatusCode::INTERNAL_SERVER_ERROR),
+            },
             Self::SQL(_) => JsonErrorResponse {
                 code: "sql_error",
                 message: "Internal server error",
