@@ -1,5 +1,6 @@
 import {HttpClient} from '@angular/common/http';
 import {ChangeDetectionStrategy, Component, inject, OnInit, signal} from '@angular/core';
+import {JsonViewModule} from 'nxt-json-view';
 import {environment} from '../../../environments/environment';
 
 export interface ImageEntity {
@@ -13,7 +14,9 @@ export interface ImageEntity {
 @Component({
     selector: 'app-image-list',
     standalone: true,
-    imports: [],
+    imports: [
+        JsonViewModule
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './image-list.component.html'
 })
@@ -43,4 +46,6 @@ export class ImageListComponent implements OnInit {
             complete: () => this.loading.set(false)
         });
     }
+
+    protected readonly JSON = JSON;
 }

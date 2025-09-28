@@ -14,10 +14,10 @@
     }
 
     @if (images() && images()!.length > 0) {
-        <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+        <ul class="grid grid-cols-[repeat(auto-fill,minmax(400px,1fr))] gap-3">
             @for (img of images()!; track img.id) {
                 <li class="border rounded-lg p-2 bg-white flex flex-col items-center">
-                    <span>{{ img.data_base64 }}</span>
+                    <nxt-json-view [data]="JSON.parse(img.data_base64)"></nxt-json-view>
                     <!--                    <img-->
                     <!--                            [src]="'data:' + img.content_type + ';base64,' + img.data_base64"-->
                     <!--                            alt="{{ img.file_name }}"-->
