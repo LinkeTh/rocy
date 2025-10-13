@@ -1,5 +1,6 @@
 pub mod db {
     pub mod pg_image_repository;
+    pub mod pg_receipt_repository;
     pub mod pg_session_repository;
     pub mod pg_user_repository;
 }

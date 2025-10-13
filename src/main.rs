@@ -18,20 +18,24 @@ use tokio::signal;
 use tracing::info;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+use crate::adapters::db::pg_receipt_repository::PgReceiptRepository;
+use crate::domain::services::receipt_service::ReceiptService;
 use adapters::db::pg_image_repository::PgImageRepository;
 use adapters::db::pg_session_repository::PgSessionRepository;
 use adapters::db::pg_user_repository::PgUserRepository;
 use adapters::http::handler;
 use adapters::oauth::google_oauth::GoogleOAuthProvider;
 use application::errors::AppError;
-use application::services::image_service::ImageService;
-use application::services::session_service::SessionService;
-use application::services::user_service::UserService;
-use application::use_cases::authentication::Authentication;
 use axum::http::request::Parts;
 use axum::http::{HeaderName, HeaderValue};
 use axum_extra::extract::PrivateCookieJar;
 use config::Config;
+use domain::services::image_service::ImageService;
+use domain::services::session_service::SessionService;
+use domain::services::user_service::UserService;
+use domain::use_cases::authentication::Authentication;
+use domain::use_cases::receipt_scanner::ReceiptScanner;
+// use jaeb::{bootstrap_listeners, EventBus};
 use reqwest::Method;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
@@ -46,6 +50,8 @@ struct AppState {
     user_service: Arc<UserService<PgUserRepository>>,
     image_service: Arc<ImageService<PgImageRepository>>,
     authentication: Arc<Authentication<PgSessionRepository, PgUserRepository, GoogleOAuthProvider>>,
+    receipt_scanner: ReceiptScanner<PgImageRepository, PgReceiptRepository>,
+    // events: jaeb::EventBus,
 }
 
 impl FromRef<AppState> for Key {
@@ -60,7 +66,7 @@ async fn main() {
     init_tracing();
     let db = init_pg_pool(&config).await;
     run_sqlx_migration(&db).await;
-    let state = init_app_state(&config, db.clone());
+    let state = init_app_state(&config, db.clone()).await;
     let app = build_routes(state);
     let addr: SocketAddr = config.bind_addr.parse().expect("Invalid BIND_ADDR");
 
@@ -72,16 +78,21 @@ async fn main() {
         .expect("server error");
 }
 
-fn init_app_state(config: &Config, db: Pool<Postgres>) -> AppState {
+async fn init_app_state(config: &Config, db: Pool<Postgres>) -> AppState {
     let provider = Arc::new(GoogleOAuthProvider::new(config.clone()));
     let session_repo = PgSessionRepository { pool: db.clone() };
     let user_repo = PgUserRepository { pool: db.clone() };
     let image_repo = PgImageRepository { pool: db.clone() };
+    let receipt_rep = PgReceiptRepository { pool: db.clone() };
     let session_service = Arc::new(SessionService::new(session_repo));
     let user_service = Arc::new(UserService::new(user_repo));
     let image_service = Arc::new(ImageService::new(image_repo, config.clone()));
-    let auth_service = Arc::new(Authentication::new(session_service.clone(), user_service.clone(), provider));
+    let receipt_service = Arc::new(ReceiptService::new(receipt_rep));
+    let authentication = Arc::new(Authentication::new(session_service.clone(), user_service.clone(), provider));
+    let receipt_scanner = ReceiptScanner::new(image_service.clone(), receipt_service.clone());
     let key = config.cookie_secret.clone();
+    // let events = EventBus::new(64);
+    // bootstrap_listeners!(&events);
 
     AppState {
         key: Key::from(key.as_bytes()),
@@ -89,7 +100,9 @@ fn init_app_state(config: &Config, db: Pool<Postgres>) -> AppState {
         session_service,
         user_service,
         image_service,
-        authentication: auth_service,
+        authentication,
+        receipt_scanner,
+        // events,
     }
 }
 
@@ -105,6 +118,7 @@ async fn init_pg_pool(config: &Config) -> Pool<Postgres> {
         .expect("Failed to connect to Postgres")
 }
 
+// TODO refactor into smaller chunks
 fn build_routes(state: AppState) -> Router {
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
 

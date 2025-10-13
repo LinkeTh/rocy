@@ -31,6 +31,8 @@ pub enum AppError {
     OpenAIError(#[from] OpenAIError),
     #[error("Serde json failed: {0}")]
     SerdeJsonError(#[from] serde_json::error::Error),
+    #[error("Upload failed: {0}")]
+    MultipartError(#[from] axum::extract::multipart::MultipartError),
 }
 
 struct AppStatusCode(StatusCode);
@@ -51,6 +53,11 @@ struct JsonErrorResponse {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let res = match &self {
+            Self::MultipartError(_) => JsonErrorResponse {
+                code: "extract_error",
+                message: "Internal server error",
+                status: AppStatusCode(StatusCode::INTERNAL_SERVER_ERROR),
+            },
             Self::SerdeJsonError(_) => JsonErrorResponse {
                 code: "external_error",
                 message: "Internal server error",

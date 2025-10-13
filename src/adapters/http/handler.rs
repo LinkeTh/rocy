@@ -12,11 +12,13 @@ use crate::adapters::http::cookie_util;
 use crate::adapters::http::request_types::AuthRequest;
 use cookie::time::Duration as CookieDuration;
 
+// TODO split handlers
+
 pub(crate) async fn health_handler() -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({ "status": "ok" })))
 }
 pub(crate) async fn images_handler(State(state): State<AppState>, profile: SessionUser) -> Result<impl IntoResponse, AppError> {
-    let result = state.image_service.find_all_images(profile).await?;
+    let result = state.image_service.find_all_images(&profile).await?;
     Ok((StatusCode::OK, Json(serde_json::json!(result))).into_response())
 }
 
@@ -26,7 +28,6 @@ pub(crate) async fn upload_handler(
     headers: HeaderMap,
     multipart: Multipart,
 ) -> Result<impl IntoResponse, AppError> {
-    // Check content type just for example
     if !headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
@@ -36,8 +37,10 @@ pub(crate) async fn upload_handler(
         return Err(AppError::InvalidContentType);
     }
 
-    let result = state.image_service.upload_image(multipart, profile).await?;
-    Ok((StatusCode::OK, Json(serde_json::json!({"result": result}))).into_response())
+    match state.receipt_scanner.try_process_receipt(multipart, &profile.user_id).await? {
+        Some(json) => Ok((StatusCode::OK, Json(serde_json::json!({"result": json}))).into_response()),
+        None => Ok((StatusCode::NO_CONTENT, ()).into_response()),
+    }
 }
 
 pub(crate) async fn login_handler(State(state): State<AppState>, jar: PrivateCookieJar) -> impl IntoResponse {

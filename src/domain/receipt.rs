@@ -1,5 +1,32 @@
 use tracing::info;
 
+use crate::application::errors::AppError;
+use async_openai::Client;
+use schemars::{schema_for, JsonSchema};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use tracing::log::error;
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Receipt {
+    pub store: String,
+    pub location: String,
+    pub date_time: String,
+    pub positions: Vec<Position>,
+    pub total: f64,
+    pub other: String,
+}
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Position {
+    pub name: String,
+    pub amount: i16,
+    pub price: f64,
+}
+
+// TODO move to own module scanner provider with trait
+
 // fn file_path(path: &str) -> PathBuf {
 //     let mut abs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 //     abs_path.push(path);
@@ -56,30 +83,7 @@ use tracing::info;
 //     Ok(())
 // }
 
-use crate::application::errors::AppError;
-use async_openai::Client;
-use schemars::{schema_for, JsonSchema};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use tracing::log::error;
-
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Receipt {
-    pub store: String,
-    pub location: String,
-    pub date_time: String,
-    pub positions: Vec<Position>,
-    pub total: f64,
-    pub other: String,
-}
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Position {
-    pub name: String,
-    pub amount: i16,
-    pub price: f64,
-}
+// TODO move to own module scanner provider with trait
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

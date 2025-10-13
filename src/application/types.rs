@@ -11,6 +11,10 @@ pub struct UserId(pub i32);
 
 #[derive(Deserialize, Debug, Serialize, Eq, sqlx::FromRow, Clone, sqlx::Type, PartialEq, Hash)]
 #[sqlx(transparent)]
+pub struct ReceiptId(pub i32);
+
+#[derive(Deserialize, Debug, Serialize, Eq, sqlx::FromRow, Clone, sqlx::Type, PartialEq, Hash)]
+#[sqlx(transparent)]
 pub struct SessionId(pub String);
 
 #[derive(Deserialize, Serialize, Debug, Eq, sqlx::FromRow, Clone, sqlx::Type, PartialEq, Hash)]

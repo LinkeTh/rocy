@@ -2,11 +2,11 @@ use crate::application::errors::AppError;
 use crate::application::ports::auth_provider::AuthProvider;
 use crate::application::ports::session_repository::SessionRepository;
 use crate::application::ports::user_repository::UserRepository;
-use crate::application::services::session_service::{SessionService, generate_session_id};
-use crate::application::services::user_service::UserService;
 use crate::application::types::{AuthCode, CSRFToken, Email, PKCEVerifier, Provider, SessionId, Sub};
-use oauth2::PkceCodeChallenge;
+use crate::domain::services::session_service::{generate_session_id, SessionService};
+use crate::domain::services::user_service::UserService;
 use oauth2::url::Url;
+use oauth2::PkceCodeChallenge;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::error;
@@ -15,15 +15,15 @@ type OauthLoginResponse = (PKCEVerifier, CSRFToken, Url);
 
 #[derive(Clone)]
 pub struct Authentication<S: SessionRepository, D: UserRepository, R: AuthProvider> {
-    session: Arc<SessionService<S>>,
-    user: Arc<UserService<D>>,
+    session_service: Arc<SessionService<S>>,
+    user_service: Arc<UserService<D>>,
     auth_provider: Arc<R>,
 }
 impl<S: SessionRepository, D: UserRepository, R: AuthProvider> Authentication<S, D, R> {
-    pub fn new(session_repo: Arc<SessionService<S>>, user_repo: Arc<UserService<D>>, auth_provider: Arc<R>) -> Self {
+    pub fn new(session_service: Arc<SessionService<S>>, user_service: Arc<UserService<D>>, auth_provider: Arc<R>) -> Self {
         Self {
-            session: session_repo,
-            user: user_repo,
+            session_service,
+            user_service,
             auth_provider,
         }
     }
@@ -40,7 +40,7 @@ impl<S: SessionRepository, D: UserRepository, R: AuthProvider> Authentication<S,
     }
 
     pub async fn logout(&self, session_id: &SessionId) {
-        if let Err(e) = self.session.delete_session(session_id).await {
+        if let Err(e) = self.session_service.delete_session(session_id).await {
             error!(?e, "failed to delete session");
         }
     }
@@ -50,7 +50,7 @@ impl<S: SessionRepository, D: UserRepository, R: AuthProvider> Authentication<S,
         let oauth_user = self.auth_provider.fetch_profile(&token).await?;
 
         let user_id = self
-            .user
+            .user_service
             .create_or_update_user(
                 &Provider(self.auth_provider.name().to_string()),
                 &Sub(oauth_user.sub),
@@ -60,7 +60,7 @@ impl<S: SessionRepository, D: UserRepository, R: AuthProvider> Authentication<S,
 
         let session_id = generate_session_id();
         let expires_at = SystemTime::now() + ttl;
-        self.session.create_session(&user_id, &session_id, expires_at).await?;
+        self.session_service.create_session(&user_id, &session_id, expires_at).await?;
 
         Ok(session_id)
     }
